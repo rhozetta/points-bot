@@ -13,6 +13,9 @@ slash = SlashCommand(client, sync_commands=True,debug_guild=766848554899079218,s
 with open("tokenfile", "r") as tokenfile:
     token=tokenfile.read()
 
+buttons1 = [create_button(style=ButtonStyle.red, label="refund",custom_id="refund"), create_button(style=ButtonStyle.green, label="mark as done",custom_id="done")]
+mod_action_row = create_actionrow(*buttons1)
+
 @client.event
 async def on_ready():
     print("hello world")
@@ -135,7 +138,7 @@ async def redeem(ctx, hidden:bool=True):
     select = create_select(options, placeholder="choose a reward", min_values=1,custom_id="redeem")
     selectionrow = create_actionrow(select)
     await ctx.send("choose a reward", components=[selectionrow], hidden=hidden)
-
+    
 @slash.slash()
 async def modchannel(ctx, channel:discord.TextChannel):
     if not ctx.channel.permissions_for(ctx.author).manage_channels:
@@ -169,14 +172,57 @@ async def redeemcallback(ctx):
 
     reward = ctx.selected_options[0]
 
+    options = []
+    for x in rewards:
+        options.append(create_select_option(f"{x} - {rewards[x]} points", value=x))
+    
+    select = create_select(options, placeholder="choose a reward", min_values=1,custom_id="redeem")
+    selectionrow = create_actionrow(select)
+    await ctx.edit_origin(content="choose a reward",components=[selectionrow],hidden=True)
+
     try:
         points[server][user] -= rewards[server][reward]
 
-        await ctx.send(f"{ctx.author.display_name} redeemed {reward} for {rewards[server][reward]} points")
+        await ctx.send(f"{ctx.author.display_name} redeemed {reward} for {rewards[server][reward]} points",hidden=True)
+
+        with open("modchannels.json","r") as channelsraw:
+            channel = json.loads(channelsraw.read())
+            channel = channel[server]
+            channel = ctx.guild.get_channel(channel)
+
+        await channel.send(f"{ctx.author.mention} redeemed {reward} for {rewards[server][reward]} points", components=[mod_action_row])
     except KeyError:
         await ctx.send("poor",hidden=True)
 
-    with open("points.json") as pointsraw:
+    with open("points.json","w") as pointsraw:
         pointsraw.write(json.dumps(points))
+
+@slash.component_callback(components=["done"])
+async def donecallback(ctx):
+    await ctx.origin_message.delete()
+    await ctx.send("marked that redeem as done")
+    await user.send("your reward was fulfilled")
+
+@slash.component_callback(components=["refund"])
+async def refundallback(ctx):
+    with open("points.json","r") as pointsraw:
+        points = json.loads(pointsraw.read())
+    
+    guild = str(ctx.guild.id)
+    user = str(ctx.origin_message.mentions[0].id)
+
+    content = ctx.origin_message.content.split(" ")
+    cost = int(content[-2])
+
+    points[guild][user] += cost
+
+    with open("points.json","w") as pointsraw:
+        pointsraw.write(json.dumps(points))
+
+    user = ctx.origin_message.mentions[0]
+
+    await ctx.send(f"refunded {cost} points to {user.display_name}", hidden=True)
+    await user.send("your reward was refunded")
+    await ctx.origin_message.delete()
 
 client.run(token)
