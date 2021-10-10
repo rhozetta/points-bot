@@ -41,4 +41,19 @@ async def on_message(message):
 async def invite(ctx):
 	await ctx.send("https://discord.com/api/oauth2/authorize?client_id=737035126222880881&permissions=68608&scope=bot%20applications.commands", hidden=True)
 
+@slash.slash()
+async def points(ctx, hidden:bool=True):
+    with open("points.json", "r") as pointsraw:
+        points = json.loads(pointsraw.read())
+
+    server = str(ctx.guild.id)
+    user = str(ctx.author.id)
+
+    try:
+        points = points[server][user]
+    except KeyError:
+        points = 0
+
+    await ctx.send(f"you have {points} points in this guild", hidden=hidden)
+
 client.run(token)
