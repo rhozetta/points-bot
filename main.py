@@ -8,7 +8,7 @@ import json
 
 intents = discord.Intents.all()
 client = commands.Bot(intents=intents, command_prefix="eat my nuts")
-slash = SlashCommand(client, sync_commands=True,debug_guild=766848554899079218,sync_on_cog_reload = True)
+slash = SlashCommand(client, sync_commands=True,sync_on_cog_reload = True)
 
 with open("tokenfile", "r") as tokenfile:
     token=tokenfile.read()
