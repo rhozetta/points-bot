@@ -56,4 +56,76 @@ async def points(ctx, hidden:bool=True):
 
     await ctx.send(f"you have {points} points in this guild", hidden=hidden)
 
+@slash.slash()
+async def addreward(ctx, name:str, cost:int, hidden:bool=True):
+    if not ctx.channel.permissions_for(ctx.author).manage_channels:
+        await ctx.send("you dont have permission to use this command",hidden=True)
+        return
+    if cost <= 0:
+        await ctx.send("please choose a cost that is higher than 0", hidden=True)
+
+    with open("rewards.json","r") as rewardsraw:
+        rewards = json.loads(rewardsraw.read())
+
+    server = str(ctx.guild.id)
+
+    try:
+        rewards[server][name] = cost
+    except KeyError:
+        rewards[server] = {}
+        rewards[server][name] = cost
+
+    with open("rewards.json","w") as rewardsraw:
+        rewardsraw.write(json.dumps(rewards))
+
+    await ctx.send(f"you made a new reward titled `{name}` that costs `{cost}` points", hidden=hidden)
+
+@slash.slash()
+async def redeem(ctx, hidden:bool=True):
+    with open("rewards.json","r") as rewardsraw:
+        rewards = json.loads(rewardsraw.read())
+
+    server = str(ctx.guild.id)
+
+    try:
+        rewards = rewards[server]
+    except KeyError:
+        await ctx.send("this guild has no rewards set", hidden=True)
+        return
+
+    options = []
+    for x in rewards:
+        options.append(create_select_option(f"{x} - {rewards[x]} points", value=x))
+    
+    if options == []:
+        await ctx.send("this guild has no rewards set", hidden=True)
+        return
+    
+    select = create_select(options, placeholder="choose a reward", min_values=1,custom_id="redeem")
+    selectionrow = create_actionrow(select)
+    await ctx.send("choose a reward", components=[selectionrow], hidden=hidden)
+
+@slash.component_callback(components=["redeem"])
+async def redeemcallback(ctx):
+    with open("rewards.json") as rewardsraw:
+        rewards = json.loads(rewardsraw.read())
+
+    with open("points.json") as pointsraw:
+        points = json.loads(pointsraw.read())
+
+    server = str(ctx.guild.id)
+    user = str(ctx.author.id)
+
+    reward = ctx.selected_options[0]
+
+    try:
+        points[server][user] -= rewards[server][reward]
+
+        await ctx.send(f"{ctx.author.display_name} redeemed {reward} for {rewards[server][reward]} points")
+    except KeyError:
+        await ctx.send("poor",hidden=True)
+
+    with open("points.json") as pointsraw:
+        pointsraw.write(json.dumps(points))
+
 client.run(token)
