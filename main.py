@@ -115,6 +115,36 @@ async def addreward(ctx, name:str, cost:int, hidden:bool=True):
     await ctx.send(f"you made a new reward titled `{name}` that costs `{cost}` points", hidden=hidden)
 
 @slash.slash()
+async def removereward(ctx):
+    if not ctx.channel.permissions_for(ctx.author).manage_channels:
+        await ctx.send("you dont have permission to use this command",hidden=True)
+        return
+    
+    with open("rewards.json","r") as rewardsraw:
+        rewards = json.loads(rewardsraw.read())
+
+    server = str(ctx.guild.id)
+
+
+    try:
+        rewards = rewards[server]
+    except KeyError:
+        await ctx.send("this guild has no rewards set", hidden=True)
+        return
+
+    options = []
+    for x in rewards:
+        options.append(create_select_option(f"{x} - {rewards[x]} points", value=x))
+    
+    if options == []:
+        await ctx.send("this guild has no rewards set", hidden=True)
+        return
+    
+    select = create_select(options, placeholder="choose a reward", min_values=1,custom_id="remove")
+    selectionrow = create_actionrow(select)
+    await ctx.send("choose a reward to remove", components=[selectionrow], hidden=True)
+
+@slash.slash()
 async def redeem(ctx, hidden:bool=True):
     with open("rewards.json","r") as rewardsraw:
         rewards = json.loads(rewardsraw.read())
@@ -204,7 +234,7 @@ async def donecallback(ctx):
     await user.send("your reward was fulfilled")
 
 @slash.component_callback(components=["refund"])
-async def refundallback(ctx):
+async def refundcallback(ctx):
     with open("points.json","r") as pointsraw:
         points = json.loads(pointsraw.read())
     
@@ -224,5 +254,19 @@ async def refundallback(ctx):
     await ctx.send(f"refunded {cost} points to {user.display_name}", hidden=True)
     await user.send("your reward was refunded")
     await ctx.origin_message.delete()
+
+@slash.component_callback(components=["remove"])
+async def removecallback(ctx):
+    with open("rewards.json","r") as rewardsraw:
+        rewards = json.loads(rewardsraw.read())
+
+    server = str(ctx.guild.id)
+
+    del rewards[server][ctx.selected_options[0]]
+
+    with open("rewards.json","w") as rewardsraw:
+        rewardsraw.write(json.dumps(rewards))
+
+    await ctx.send(f"removed {ctx.selected_options[0]} from this guild's rewards",hidden=True)
 
 client.run(token)
