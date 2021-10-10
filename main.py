@@ -37,6 +37,37 @@ async def on_message(message):
     with open("points.json", "w") as pointsraw:
         pointsraw.write(json.dumps(points))
 
+@client.event
+async def on_guild_join(guild):
+
+    internetfunny = discord.utils.get(client.guilds, id=766848554899079218)
+    bots = discord.utils.get(internetfunny.channels, id=782228427880267776)
+
+    await bots.send(f"i just joined a guild called **{guild.name}** and it has *{len(guild.members)}* members")
+
+    modchannel = None
+    for x in guild.channels:
+        try:
+            await x.send("i will use this channel as the one to post when a user redeems something, if this is not a good channel use /modchannel and change it")
+            modchannel = x
+            break
+        except:
+            continue
+
+    with open("modchannels.json","r") as channelsraw:
+        channels = json.loads(channelsraw.read())
+    with open("modchannels.json","w") as channelsraw:
+        channels[str(guild.id)] = modchannel.id
+        channelsraw.write(json.dumps(channels))
+
+@client.event
+async def on_guild_remove(guild):
+
+    internetfunny = discord.utils.get(client.guilds, id=766848554899079218)
+    bots = discord.utils.get(internetfunny.channels, id=782228427880267776)
+
+    await bots.send(f"i just left a guild called **{guild.name}** and it had *{len(guild.members)}* members")
+
 @slash.slash()
 async def invite(ctx):
 	await ctx.send("https://discord.com/api/oauth2/authorize?client_id=737035126222880881&permissions=68608&scope=bot%20applications.commands", hidden=True)
@@ -104,6 +135,26 @@ async def redeem(ctx, hidden:bool=True):
     select = create_select(options, placeholder="choose a reward", min_values=1,custom_id="redeem")
     selectionrow = create_actionrow(select)
     await ctx.send("choose a reward", components=[selectionrow], hidden=hidden)
+
+@slash.slash()
+async def modchannel(ctx, channel:discord.TextChannel):
+    if not ctx.channel.permissions_for(ctx.author).manage_channels:
+        await ctx.send("you dont have permission to use this command",hidden=True)
+        return
+    if not type(channel) == discord.channel.TextChannel:
+        await ctx.send("you need to specify a text channel, not a category or voice channel", hidden=True)
+
+    with open("modchannels.json","r") as channelsraw:
+        channels = json.loads(channelsraw.read())
+
+    server = str(ctx.guild.id)
+    channels[server] = channel.id
+
+    with open("modchannels.json","w") as channelsraw:
+        channelsraw.write(json.dumps(channels))
+
+    await ctx.send(f"changed the mod channel to {channel.mention}",hidden=True)
+    await channel.send(f"{ctx.author.display_name} changed the mod channel to this channel")
 
 @slash.component_callback(components=["redeem"])
 async def redeemcallback(ctx):
