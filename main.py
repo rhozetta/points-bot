@@ -8,7 +8,7 @@ import json
 
 intents = discord.Intents.all()
 client = commands.Bot(intents=intents, command_prefix="eat my nuts")
-slash = SlashCommand(client, sync_commands=True,debug_guild=766848554899079218,sync_on_cog_reload = True)
+slash = SlashCommand(client, sync_commands=True,sync_on_cog_reload = True)
 
 with open("tokenfile", "r") as tokenfile:
     token=tokenfile.read()
@@ -295,7 +295,7 @@ async def leaderboard(ctx, hidden: bool = True):
             user = client.get_user(int(x))
             message += f"{user.mention} - {score}\n"
 
-    embed = discord.Embed(description=message)
+    embed = discord.Embed(title=f"leaderboard for {ctx.guild.name}", description=message, color=discord.Color.blurple())
     await ctx.send(embed=embed,hidden=hidden)
 
 client.run(token)
