@@ -8,7 +8,7 @@ import json
 
 intents = discord.Intents.all()
 client = commands.Bot(intents=intents, command_prefix="eat my nuts")
-slash = SlashCommand(client, sync_commands=True,sync_on_cog_reload = True)
+slash = SlashCommand(client, sync_commands=True,debug_guild=766848554899079218,sync_on_cog_reload = True)
 
 with open("tokenfile", "r") as tokenfile:
     token=tokenfile.read()
@@ -22,6 +22,10 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
+
+    if message.author.bot:
+        return
+
     with open("points.json", "r") as pointsraw:
         points = json.loads(pointsraw.read())
 
@@ -268,5 +272,30 @@ async def removecallback(ctx):
         rewardsraw.write(json.dumps(rewards))
 
     await ctx.send(f"removed {ctx.selected_options[0]} from this guild's rewards",hidden=True)
+
+@slash.slash()
+async def leaderboard(ctx, hidden: bool = True):
+    server = str(ctx.guild.id)
+    user = str(ctx.author.id)
+
+    with open("points.json", "r") as pointsraw:
+        points = json.loads(pointsraw.read())
+        points = points[server]
+
+    leaderboard = sorted(points,reverse=True,key=lambda x: points[x])
+
+    message = ""
+    for x in leaderboard:
+        score = points[x]
+
+        if x == user:
+            user = client.get_user(int(x))
+            message += f"**{user.mention} - {score}**\n"
+        else:
+            user = client.get_user(int(x))
+            message += f"{user.mention} - {score}\n"
+
+    embed = discord.Embed(description=message)
+    await ctx.send(embed=embed,hidden=hidden)
 
 client.run(token)
