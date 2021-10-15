@@ -289,11 +289,9 @@ async def leaderboard(ctx, hidden: bool = True):
         score = points[x]
 
         if x == user:
-            user = client.get_user(int(x))
-            message += f"**{user.mention} - {score}**\n"
+            message += f"**<@{x}> - {score}**\n"
         else:
-            user = client.get_user(int(x))
-            message += f"{user.mention} - {score}\n"
+            message += f"<@{x}> - {score}\n"
 
     embed = discord.Embed(title=f"leaderboard for {ctx.guild.name}", description=message, color=discord.Color.blurple())
     await ctx.send(embed=embed,hidden=hidden)
