@@ -197,6 +197,7 @@ async def modchannel(ctx, channel:discord.TextChannel):
 async def redeemcallback(ctx):
     with open("rewards.json") as rewardsraw:
         rewards = json.loads(rewardsraw.read())
+        rewards = rewards[str(ctx.guild.id)]
 
     with open("points.json") as pointsraw:
         points = json.loads(pointsraw.read())
