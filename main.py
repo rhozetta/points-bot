@@ -197,7 +197,6 @@ async def modchannel(ctx, channel:discord.TextChannel):
 async def redeemcallback(ctx):
     with open("rewards.json") as rewardsraw:
         rewards = json.loads(rewardsraw.read())
-        rewards = rewards[str(ctx.guild.id)]
 
     with open("points.json") as pointsraw:
         points = json.loads(pointsraw.read())
@@ -206,6 +205,7 @@ async def redeemcallback(ctx):
     user = str(ctx.author.id)
 
     reward = ctx.selected_options[0]
+    rewards = rewards[str(ctx.guild.id)]
 
     options = []
     for x in rewards:
@@ -216,21 +216,21 @@ async def redeemcallback(ctx):
     await ctx.edit_origin(content="choose a reward",components=[selectionrow],hidden=True)
 
     try:
-        points[server][user] -= rewards[server][reward]
+        points[server][user] -= rewards[reward]
 
-        await ctx.send(f"{ctx.author.display_name} redeemed {reward} for {rewards[server][reward]} points",hidden=True)
+        await ctx.send(f"{ctx.author.display_name} redeemed {reward} for {rewards[reward]} points",hidden=True)
 
         with open("modchannels.json","r") as channelsraw:
             channel = json.loads(channelsraw.read())
             channel = channel[server]
             channel = ctx.guild.get_channel(channel)
 
-        await channel.send(f"{ctx.author.mention} redeemed {reward} for {rewards[server][reward]} points", components=[mod_action_row])
+        await channel.send(f"{ctx.author.mention} redeemed {reward} for {rewards[reward]} points", components=[mod_action_row])
+
+        with open("points.json","w") as pointsraw:
+            pointsraw.write(json.dumps(points))
     except KeyError:
         await ctx.send("poor",hidden=True)
-
-    with open("points.json","w") as pointsraw:
-        pointsraw.write(json.dumps(points))
 
 @slash.component_callback(components=["done"])
 async def donecallback(ctx):
@@ -257,7 +257,7 @@ async def refundcallback(ctx):
     user = ctx.origin_message.mentions[0]
 
     await ctx.send(f"refunded {cost} points to {user.display_name}", hidden=True)
-    await user.send("your reward was refunded")
+    await user.send(f"your reward was refunded for {cost} points")
     await ctx.origin_message.delete()
 
 @slash.component_callback(components=["remove"])
