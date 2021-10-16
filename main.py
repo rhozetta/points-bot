@@ -255,9 +255,10 @@ async def refundcallback(ctx):
         pointsraw.write(json.dumps(points))
 
     user = ctx.origin_message.mentions[0]
+    reward = " ".join(content[2:-3])
 
     await ctx.send(f"refunded {cost} points to {user.display_name}", hidden=True)
-    await user.send(f"your reward was refunded for {cost} points")
+    await user.send(f"your reward, `{reward}`, was refunded for {cost} points")
     await ctx.origin_message.delete()
 
 @slash.component_callback(components=["remove"])
