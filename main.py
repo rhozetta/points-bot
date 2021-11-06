@@ -218,6 +218,7 @@ async def redeemcallback(ctx):
     try:
         if not points[server][user] >= rewards[reward]:
             await ctx.send("poor",hidden=True)
+            return
         points[server][user] -= rewards[reward]
 
         await ctx.send(f"{ctx.author.display_name} redeemed {reward} for {rewards[reward]} points",hidden=True)
