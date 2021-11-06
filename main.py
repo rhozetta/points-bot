@@ -216,6 +216,8 @@ async def redeemcallback(ctx):
     await ctx.edit_origin(content="choose a reward",components=[selectionrow],hidden=True)
 
     try:
+        if not points[server][user] >= rewards[reward]:
+            await ctx.send("poor",hidden=True)
         points[server][user] -= rewards[reward]
 
         await ctx.send(f"{ctx.author.display_name} redeemed {reward} for {rewards[reward]} points",hidden=True)
