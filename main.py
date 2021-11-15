@@ -8,13 +8,23 @@ import json
 
 intents = discord.Intents.all()
 client = commands.Bot(intents=intents, command_prefix="eat my nuts")
-slash = SlashCommand(client, sync_commands=True,sync_on_cog_reload = True)
+slash = SlashCommand(client, sync_commands=True,sync_on_cog_reload = True,debug_guild=766848554899079218)
 
 with open("tokenfile", "r") as tokenfile:
     token=tokenfile.read()
 
 buttons1 = [create_button(style=ButtonStyle.red, label="refund",custom_id="refund"), create_button(style=ButtonStyle.green, label="mark as done",custom_id="done")]
 mod_action_row = create_actionrow(*buttons1)
+
+async def getname(id):
+    with open("names.json", "r") as namesraw:
+        names = json.loads(namesraw.read())
+        try:
+            name = names[str(id)]
+        except KeyError:
+            name = "points"
+
+    return name
 
 @client.event
 async def on_ready():
@@ -80,7 +90,7 @@ async def invite(ctx):
 	await ctx.send("https://discord.com/api/oauth2/authorize?client_id=737035126222880881&permissions=68608&scope=bot%20applications.commands", hidden=True)
 
 @slash.slash()
-async def points(ctx, hidden:bool=True):
+async def points(ctx, hidden:bool=True): 
     with open("points.json", "r") as pointsraw:
         points = json.loads(pointsraw.read())
 
@@ -92,7 +102,8 @@ async def points(ctx, hidden:bool=True):
     except KeyError:
         points = 0
 
-    await ctx.send(f"you have {points} points in this guild", hidden=hidden)
+    name = await getname(ctx.guild.id)
+    await ctx.send(f"you have {points} {name} in this guild", hidden=hidden)
 
 @slash.slash()
 async def addreward(ctx, name:str, cost:int, hidden:bool=True):
@@ -116,7 +127,8 @@ async def addreward(ctx, name:str, cost:int, hidden:bool=True):
     with open("rewards.json","w") as rewardsraw:
         rewardsraw.write(json.dumps(rewards))
 
-    await ctx.send(f"you made a new reward titled `{name}` that costs `{cost}` points", hidden=hidden)
+    pointsname = await getname(ctx.guild.id)
+    await ctx.send(f"you made a new reward titled `{name}` that costs `{cost}` {pointsname}", hidden=hidden)
 
 @slash.slash()
 async def removereward(ctx):
@@ -137,8 +149,9 @@ async def removereward(ctx):
         return
 
     options = []
+    name = await getname(ctx.guild.id)
     for x in rewards:
-        options.append(create_select_option(f"{x} - {rewards[x]} points", value=x))
+        options.append(create_select_option(f"{x} - {rewards[x]} {name}", value=x))
     
     if options == []:
         await ctx.send("this guild has no rewards set", hidden=True)
@@ -162,8 +175,9 @@ async def redeem(ctx, hidden:bool=True):
         return
 
     options = []
+    name = await getname(ctx.guild.id)
     for x in rewards:
-        options.append(create_select_option(f"{x} - {rewards[x]} points", value=x))
+        options.append(create_select_option(f"{x} - {rewards[x]} {name}", value=x))
     
     if options == []:
         await ctx.send("this guild has no rewards set", hidden=True)
@@ -193,6 +207,20 @@ async def modchannel(ctx, channel:discord.TextChannel):
     await ctx.send(f"changed the mod channel to {channel.mention}",hidden=True)
     await channel.send(f"{ctx.author.display_name} changed the mod channel to this channel")
 
+@slash.slash()
+async def name(ctx, name:str, hidden:bool=True):
+    with open("names.json", "r") as namesraw:
+        names = json.loads(namesraw.read())
+
+    server = str(ctx.guild.id)
+
+    names[server] = name
+
+    with open("names.json", "w") as namesraw:
+        namesraw.write(json.dumps(names))
+
+    await ctx.send(f"changed guild's points name to {name}",hidden=hidden)
+
 @slash.component_callback(components=["redeem"])
 async def redeemcallback(ctx):
     with open("rewards.json") as rewardsraw:
@@ -208,8 +236,9 @@ async def redeemcallback(ctx):
     rewards = rewards[str(ctx.guild.id)]
 
     options = []
+    name = await getname(ctx.guild.id)
     for x in rewards:
-        options.append(create_select_option(f"{x} - {rewards[x]} points", value=x))
+        options.append(create_select_option(f"{x} - {rewards[x]} {name}", value=x))
     
     select = create_select(options, placeholder="choose a reward", min_values=1,custom_id="redeem")
     selectionrow = create_actionrow(select)
@@ -221,14 +250,16 @@ async def redeemcallback(ctx):
             return
         points[server][user] -= rewards[reward]
 
-        await ctx.send(f"{ctx.author.display_name} redeemed {reward} for {rewards[reward]} points",hidden=True)
+        name = await getname(ctx.guild.id)
+        await ctx.send(f"{ctx.author.display_name} redeemed {reward} for {rewards[reward]} {name}",hidden=True)
 
         with open("modchannels.json","r") as channelsraw:
             channel = json.loads(channelsraw.read())
             channel = channel[server]
             channel = ctx.guild.get_channel(channel)
 
-        await channel.send(f"{ctx.author.mention} redeemed {reward} for {rewards[reward]} points", components=[mod_action_row])
+        name = await getname(ctx.guild.id)
+        await channel.send(f"{ctx.author.mention} redeemed {reward} for {rewards[reward]} {name}", components=[mod_action_row])
 
         with open("points.json","w") as pointsraw:
             pointsraw.write(json.dumps(points))
@@ -249,8 +280,10 @@ async def refundcallback(ctx):
     guild = str(ctx.guild.id)
     user = str(ctx.origin_message.mentions[0].id)
 
-    content = ctx.origin_message.content.split(" ")
-    cost = int(content[-2])
+    name = await getname(ctx.guild.id)
+    content = ctx.origin_message.content.replace(name, "")
+    content = content.split(" ")
+    cost = int(content[-1])
 
     points[guild][user] += cost
 
@@ -260,8 +293,8 @@ async def refundcallback(ctx):
     user = ctx.origin_message.mentions[0]
     reward = " ".join(content[2:-3])
 
-    await ctx.send(f"refunded {cost} points to {user.display_name}", hidden=True)
-    await user.send(f"your reward, `{reward}`, was refunded for {cost} points")
+    await ctx.send(f"refunded {cost} {name} to {user.display_name}", hidden=True)
+    await user.send(f"your reward, `{reward}`, was refunded for {cost} {name}")
     await ctx.origin_message.delete()
 
 @slash.component_callback(components=["remove"])
