@@ -97,20 +97,24 @@ async def invite(ctx):
 	await ctx.respond("https://discord.com/api/oauth2/authorize?client_id=737035126222880881&permissions=68608&scope=bot%20applications.commands", ephemeral=True)
 
 @bot.slash_command()
-async def points(ctx, hidden:bool=True): 
-    with open("points.json", "r") as pointsraw:
-        points = json.loads(pointsraw.read())
+async def points(ctx, user:discord.User=None, hidden:bool=True): 
+    if user != bot.user:
+        with open("points.json", "r") as pointsraw:
+            points = json.loads(pointsraw.read())
 
-    server = str(ctx.guild.id)
-    user = str(ctx.author.id)
+        server = str(ctx.guild.id)
+        if user is None:
+            user = ctx.author
 
-    try:
-        points = points[server][user]
-    except KeyError:
-        points = 0
+        try:
+            points = points[server][str(user.id)]
+        except KeyError:
+            points = 0
 
-    name = getname(ctx.guild.id)
-    await ctx.respond(f"you have {points} {name} in this guild", ephemeral=hidden)
+        name = getname(ctx.guild.id)
+        await ctx.respond(f"{user} has {points} {name} in this guild", ephemeral=hidden)
+    else:
+        await ctx.respond(f"I am in {len(bot.guilds)} servers", ephemeral=hidden)
 
 @bot.slash_command()
 async def addreward(ctx, name:str, cost:int, hidden:bool=True):
@@ -190,6 +194,46 @@ async def modchannel(ctx, channel:discord.TextChannel):
     await ctx.respond(f"changed the mod channel to {channel.mention}",ephemeral=True)
     await channel.send(f"{ctx.author.display_name} changed the mod channel to this channel")
 
+@bot.slash_command()
+async def leaderboard(ctx, hidden: bool = True):
+    server = str(ctx.guild.id)
+    user = str(ctx.author.id)
+
+    with open("points.json", "r") as pointsraw:
+        points = json.loads(pointsraw.read())
+        points = points[server]
+
+    leaderboard = sorted(points,reverse=True,key=lambda x: points[x])
+
+    message = ""
+    for x in leaderboard:
+        score = points[x]
+
+        if x == user:
+            addtomessage = f"**<@{x}> - {score}**\n"
+        else:
+            addtomessage = f"<@{x}> - {score}\n"
+
+        if len(addtomessage) + len(message) > 4096:
+            break
+        else:
+            message += addtomessage
+
+    embed = discord.Embed(title=f"leaderboard for {ctx.guild.name}", description=message, color=discord.Color.blurple())
+    await ctx.respond(embed=embed,ephemeral=hidden)
+
+@bot.slash_command()
+async def name(ctx, name:str = "points"):
+    with open("names.json", "r") as namesraw:
+        names = json.loads(namesraw.read())
+
+    names[str(ctx.guild_id)] = name
+
+    with open("names.json", "w") as namesraw:
+        namesraw.write(json.dumps(names))
+
+    await ctx.respond(f"name of server points changed to {name}",ephemeral=True)
+
 def RedeemViewFunc(options):
     if options is None:
         return None
@@ -268,7 +312,6 @@ class ModView(discord.ui.View):
         await user.send(f"Your reward, {rewardname}, was refunded to you for {rewardcost} {name} by {Interaction.user} in {guild.name}")
         await Interaction.message.edit(content="Refunded!",view=None,delete_after=5)
 
-
 def RemoveViewFunc(options):
     if options is None:
         return None
@@ -290,32 +333,5 @@ def RemoveViewFunc(options):
 
     return RemoveView()
 
-@bot.slash_command()
-async def leaderboard(ctx, hidden: bool = True):
-    server = str(ctx.guild.id)
-    user = str(ctx.author.id)
-
-    with open("points.json", "r") as pointsraw:
-        points = json.loads(pointsraw.read())
-        points = points[server]
-
-    leaderboard = sorted(points,reverse=True,key=lambda x: points[x])
-
-    message = ""
-    for x in leaderboard:
-        score = points[x]
-
-        if x == user:
-            addtomessage = f"**<@{x}> - {score}**\n"
-        else:
-            addtomessage = f"<@{x}> - {score}\n"
-
-        if len(addtomessage) + len(message) > 4096:
-            break
-        else:
-            message += addtomessage
-
-    embed = discord.Embed(title=f"leaderboard for {ctx.guild.name}", description=message, color=discord.Color.blurple())
-    await ctx.respond(embed=embed,ephemeral=hidden)
 
 bot.run(token)
