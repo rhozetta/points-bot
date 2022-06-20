@@ -1,22 +1,14 @@
 import discord
-from discord.ext import commands
-from discord_slash import SlashCommand, SlashContext
-from discord_slash.utils.manage_components import create_button, create_actionrow, wait_for_component, ComponentContext, create_select_option, create_select
-from discord_slash.utils.manage_commands import create_permission
-from discord_slash.model import ButtonStyle, SlashCommandPermissionType
+
 import json
 
 intents = discord.Intents.all()
-client = commands.Bot(intents=intents, command_prefix="eat my nuts")
-slash = SlashCommand(client, sync_commands=True,sync_on_cog_reload = True)
+bot = discord.Bot(intents=intents)
 
 with open("tokenfile", "r") as tokenfile:
     token=tokenfile.read()
 
-buttons1 = [create_button(style=ButtonStyle.red, label="refund",custom_id="refund"), create_button(style=ButtonStyle.green, label="mark as done",custom_id="done")]
-mod_action_row = create_actionrow(*buttons1)
-
-async def getname(id):
+def getname(id):
     with open("names.json", "r") as namesraw:
         names = json.loads(namesraw.read())
         try:
@@ -26,11 +18,26 @@ async def getname(id):
 
     return name
 
-@client.event
+def getoptions(ctx):
+    with open("rewards.json","r") as rewardsraw:
+        rewards = json.loads(rewardsraw.read())
+
+    server = str(ctx.guild.id)
+    rewards = rewards[server]
+
+    options = []
+    name = getname(ctx.guild.id)
+    for x in rewards:
+        options.append(discord.SelectOption(label=f"{x} - {rewards[x]} {name}", value=x))
+    if options == []:
+        return None
+    return options
+
+@bot.event
 async def on_ready():
     print("hello world")
 
-@client.event
+@bot.event
 async def on_message(message):
 
     if message.author.bot:
@@ -54,10 +61,10 @@ async def on_message(message):
     with open("points.json", "w") as pointsraw:
         pointsraw.write(json.dumps(points))
 
-@client.event
+@bot.event
 async def on_guild_join(guild):
 
-    internetfunny = discord.utils.get(client.guilds, id=766848554899079218)
+    internetfunny = discord.utils.get(bot.guilds, id=766848554899079218)
     bots = discord.utils.get(internetfunny.channels, id=782228427880267776)
 
     await bots.send(f"i just joined a guild called **{guild.name}** and it has *{len(guild.members)}* members")
@@ -77,19 +84,19 @@ async def on_guild_join(guild):
         channels[str(guild.id)] = modchannel.id
         channelsraw.write(json.dumps(channels))
 
-@client.event
+@bot.event
 async def on_guild_remove(guild):
 
-    internetfunny = discord.utils.get(client.guilds, id=766848554899079218)
+    internetfunny = discord.utils.get(bot.guilds, id=766848554899079218)
     bots = discord.utils.get(internetfunny.channels, id=782228427880267776)
 
     await bots.send(f"i just left a guild called **{guild.name}** and it had *{len(guild.members)}* members")
 
-@slash.slash()
+@bot.slash_command()
 async def invite(ctx):
-	await ctx.send("https://discord.com/api/oauth2/authorize?client_id=737035126222880881&permissions=68608&scope=bot%20applications.commands", hidden=True)
+	await ctx.respond("https://discord.com/api/oauth2/authorize?client_id=737035126222880881&permissions=68608&scope=bot%20applications.commands", ephemeral=True)
 
-@slash.slash()
+@bot.slash_command()
 async def points(ctx, hidden:bool=True): 
     with open("points.json", "r") as pointsraw:
         points = json.loads(pointsraw.read())
@@ -102,16 +109,16 @@ async def points(ctx, hidden:bool=True):
     except KeyError:
         points = 0
 
-    name = await getname(ctx.guild.id)
-    await ctx.send(f"you have {points} {name} in this guild", hidden=hidden)
+    name = getname(ctx.guild.id)
+    await ctx.respond(f"you have {points} {name} in this guild", ephemeral=hidden)
 
-@slash.slash()
+@bot.slash_command()
 async def addreward(ctx, name:str, cost:int, hidden:bool=True):
     if not ctx.channel.permissions_for(ctx.author).manage_channels:
-        await ctx.send("you dont have permission to use this command",hidden=True)
+        await ctx.respond("you dont have permission to use this command",ephemeral=True)
         return
     if cost <= 0:
-        await ctx.send("please choose a cost that is higher than 0", hidden=True)
+        await ctx.respond("please choose a cost that is higher than 0", ephemeral=True)
 
     with open("rewards.json","r") as rewardsraw:
         rewards = json.loads(rewardsraw.read())
@@ -127,13 +134,13 @@ async def addreward(ctx, name:str, cost:int, hidden:bool=True):
     with open("rewards.json","w") as rewardsraw:
         rewardsraw.write(json.dumps(rewards))
 
-    pointsname = await getname(ctx.guild.id)
-    await ctx.send(f"you made a new reward titled `{name}` that costs `{cost}` {pointsname}", hidden=hidden)
+    pointsname = getname(ctx.guild.id)
+    await ctx.respond(f"you made a new reward titled `{name}` that costs `{cost}` {pointsname}", ephemeral=hidden)
 
-@slash.slash()
+@bot.slash_command()
 async def removereward(ctx):
     if not ctx.channel.permissions_for(ctx.author).manage_channels:
-        await ctx.send("you dont have permission to use this command",hidden=True)
+        await ctx.respond("you dont have permission to use this command",ephemeral=True)
         return
     
     with open("rewards.json","r") as rewardsraw:
@@ -141,59 +148,35 @@ async def removereward(ctx):
 
     server = str(ctx.guild.id)
 
-
     try:
         rewards = rewards[server]
+        if rewards == []:
+            await ctx.respond("this guild has no rewards set", ephemeral=True)
+            return
     except KeyError:
-        await ctx.send("this guild has no rewards set", hidden=True)
+        await ctx.respond("this guild has no rewards set", ephemeral=True)
         return
 
-    options = []
-    name = await getname(ctx.guild.id)
-    for x in rewards:
-        options.append(create_select_option(f"{x} - {rewards[x]} {name}", value=x))
-    
-    if options == []:
-        await ctx.send("this guild has no rewards set", hidden=True)
-        return
-    
-    select = create_select(options, placeholder="choose a reward", min_values=1,custom_id="remove")
-    selectionrow = create_actionrow(select)
-    await ctx.send("choose a reward to remove", components=[selectionrow], hidden=True)
+    options = getoptions(ctx)
+    await ctx.respond("choose a reward to remove", view=RemoveViewFunc(options), ephemeral=True)
 
-@slash.slash()
+@bot.slash_command()
 async def redeem(ctx, hidden:bool=True):
-    with open("rewards.json","r") as rewardsraw:
-        rewards = json.loads(rewardsraw.read())
-
-    server = str(ctx.guild.id)
-
-    try:
-        rewards = rewards[server]
-    except KeyError:
-        await ctx.send("this guild has no rewards set", hidden=True)
-        return
-
-    options = []
-    name = await getname(ctx.guild.id)
-    for x in rewards:
-        options.append(create_select_option(f"{x} - {rewards[x]} {name}", value=x))
+    options = getoptions(ctx)
     
     if options == []:
-        await ctx.send("this guild has no rewards set", hidden=True)
+        await ctx.respond("this guild has no rewards set", ephemeral=True)
         return
     
-    select = create_select(options, placeholder="choose a reward", min_values=1,custom_id="redeem")
-    selectionrow = create_actionrow(select)
-    await ctx.send("choose a reward", components=[selectionrow], hidden=hidden)
-    
-@slash.slash()
+    await ctx.respond("choose a reward", view=RedeemViewFunc(options), ephemeral=hidden)
+
+@bot.slash_command()
 async def modchannel(ctx, channel:discord.TextChannel):
     if not ctx.channel.permissions_for(ctx.author).manage_channels:
-        await ctx.send("you dont have permission to use this command",hidden=True)
+        await ctx.respond("you dont have permission to use this command",ephemeral=True)
         return
     if not type(channel) == discord.channel.TextChannel:
-        await ctx.send("you need to specify a text channel, not a category or voice channel", hidden=True)
+        await ctx.respond("you need to specify a text channel, not a category or voice channel", ephemeral=True)
 
     with open("modchannels.json","r") as channelsraw:
         channels = json.loads(channelsraw.read())
@@ -204,114 +187,110 @@ async def modchannel(ctx, channel:discord.TextChannel):
     with open("modchannels.json","w") as channelsraw:
         channelsraw.write(json.dumps(channels))
 
-    await ctx.send(f"changed the mod channel to {channel.mention}",hidden=True)
+    await ctx.respond(f"changed the mod channel to {channel.mention}",ephemeral=True)
     await channel.send(f"{ctx.author.display_name} changed the mod channel to this channel")
 
-@slash.slash()
-async def name(ctx, name:str, hidden:bool=True):
-    with open("names.json", "r") as namesraw:
-        names = json.loads(namesraw.read())
+def RedeemViewFunc(options):
+    if options is None:
+        return None
 
-    server = str(ctx.guild.id)
+    class RedeemView(discord.ui.View):
+        @discord.ui.select(placeholder = "choose a reward", min_values = 1, max_values = 1, options=options)
+        async def redeemcallback(self, Select, Interaction):
+            with open("rewards.json") as rewardsraw:
+                rewards = json.loads(rewardsraw.read())
+            
+            with open("points.json") as pointsraw:
+                points = json.loads(pointsraw.read())
 
-    names[server] = name
+            server = str(Interaction.guild_id)
+            user = str(Interaction.user.id)
 
-    with open("names.json", "w") as namesraw:
-        namesraw.write(json.dumps(names))
+            reward = Select.values[0]
+            rewards = rewards[server]
+            options = getoptions(Interaction)
 
-    await ctx.send(f"changed guild's points name to {name}",hidden=hidden)
+            try:
+                if not points[server][user] >= rewards[reward]:
+                    await Interaction.response.send_message("poor",ephemeral=True)
+                    return
+                points[server][user] -= rewards[reward]
 
-@slash.component_callback(components=["redeem"])
-async def redeemcallback(ctx):
-    with open("rewards.json") as rewardsraw:
-        rewards = json.loads(rewardsraw.read())
+                name = getname(server)
+                await Interaction.response.send_message(f"you redeemed **{reward}** for `{rewards[reward]}` {name}",ephemeral=True)
 
-    with open("points.json") as pointsraw:
-        points = json.loads(pointsraw.read())
+                with open("modchannels.json","r") as channelsraw:
+                    channel = json.loads(channelsraw.read())
+                    channel = channel[server]
+                    channel = Interaction.guild.get_channel(channel)
 
-    server = str(ctx.guild.id)
-    user = str(ctx.author.id)
+                name = getname(Interaction.guild_id)
+                await channel.send(f"{Interaction.user.mention} redeemed **{reward}** for `{rewards[reward]}` {name}", view=ModView())
 
-    reward = ctx.selected_options[0]
-    rewards = rewards[str(ctx.guild.id)]
+                with open("points.json","w") as pointsraw:
+                    pointsraw.write(json.dumps(points))
+            except KeyError:
+                await Interaction.response.send_message("poor",ephemeral=True)
 
-    options = []
-    name = await getname(ctx.guild.id)
-    for x in rewards:
-        options.append(create_select_option(f"{x} - {rewards[x]} {name}", value=x))
-    
-    select = create_select(options, placeholder="choose a reward", min_values=1,custom_id="redeem")
-    selectionrow = create_actionrow(select)
-    await ctx.edit_origin(content="choose a reward",components=[selectionrow],hidden=True)
+    return RedeemView()
 
-    try:
-        if not points[server][user] >= rewards[reward]:
-            await ctx.send("poor",hidden=True)
-            return
-        points[server][user] -= rewards[reward]
+class ModView(discord.ui.View):
+    @discord.ui.button(label="Done", row=0, style=discord.ButtonStyle.green)
+    async def done_button_callback(self, Button, Interaction):
+        message = Interaction.message
+        rewardname = message.content.split("**")
+        rewardname = rewardname[1]
+        await message.mentions[0].send(f"{rewardname} was marked as done")
+        await Interaction.message.edit(content="Marked as done!",view=None,delete_after=5)
 
-        name = await getname(ctx.guild.id)
-        await ctx.send(f"{ctx.author.display_name} redeemed {reward} for {rewards[reward]} {name}",hidden=True)
+    @discord.ui.button(label="Refund", row=0, style=discord.ButtonStyle.red)
+    async def refund_button_callback(self, Button, Interaction):
+        message = Interaction.message
 
-        with open("modchannels.json","r") as channelsraw:
-            channel = json.loads(channelsraw.read())
-            channel = channel[server]
-            channel = ctx.guild.get_channel(channel)
+        with open("points.json","r") as pointsraw:
+            points = json.loads(pointsraw.read())
+        
+        rewardname = message.content.split("**")
+        rewardname = rewardname[1]
+        rewardcost = message.content.split("`")
+        rewardcost = int(rewardcost[1])
 
-        name = await getname(ctx.guild.id)
-        await channel.send(f"{ctx.author.mention} redeemed {reward} for {rewards[reward]} {name}", components=[mod_action_row])
+        guild = Interaction.guild
+        user = Interaction.message.mentions[0]
+
+        points[str(guild.id)][str(user.id)] += rewardcost
 
         with open("points.json","w") as pointsraw:
             pointsraw.write(json.dumps(points))
-    except KeyError:
-        await ctx.send("poor",hidden=True)
+        
+        name = getname(Interaction.guild_id)
 
-@slash.component_callback(components=["done"])
-async def donecallback(ctx):
-    await ctx.origin_message.delete()
-    await ctx.send("marked that redeem as done")
-    await user.send("your reward was fulfilled")
+        await user.send(f"Your reward, {rewardname}, was refunded to you for {rewardcost} {name} by {Interaction.user} in {guild.name}")
+        await Interaction.message.edit(content="Refunded!",view=None,delete_after=5)
 
-@slash.component_callback(components=["refund"])
-async def refundcallback(ctx):
-    with open("points.json","r") as pointsraw:
-        points = json.loads(pointsraw.read())
-    
-    guild = str(ctx.guild.id)
-    user = str(ctx.origin_message.mentions[0].id)
 
-    name = await getname(ctx.guild.id)
-    content = ctx.origin_message.content.replace(name, "")
-    content = content.split(" ")
-    cost = int(content[-1])
+def RemoveViewFunc(options):
+    if options is None:
+        return None
 
-    points[guild][user] += cost
+    class RemoveView(discord.ui.View):
+        @discord.ui.select(placeholder = "choose a reward to remove", min_values = 1, max_values = 1, options=options)
+        async def removecallback(self, Select, Interaction):
+            with open("rewards.json","r") as rewardsraw:
+                rewards = json.loads(rewardsraw.read())
 
-    with open("points.json","w") as pointsraw:
-        pointsraw.write(json.dumps(points))
+            server = str(Interaction.guild_id)
 
-    user = ctx.origin_message.mentions[0]
-    reward = " ".join(content[2:-3])
+            del rewards[server][Select.values[0]]
 
-    await ctx.send(f"refunded {cost} {name} to {user.display_name}", hidden=True)
-    await user.send(f"your reward, `{reward}`, was refunded for {cost} {name}")
-    await ctx.origin_message.delete()
+            with open("rewards.json","w") as rewardsraw:
+                rewardsraw.write(json.dumps(rewards))
 
-@slash.component_callback(components=["remove"])
-async def removecallback(ctx):
-    with open("rewards.json","r") as rewardsraw:
-        rewards = json.loads(rewardsraw.read())
+            await Interaction.response.send_message(content=f"removed {Select.values[0]} from this guild's rewards",view=RemoveViewFunc(options=getoptions(ctx=Interaction)),ephemeral=True)
 
-    server = str(ctx.guild.id)
+    return RemoveView()
 
-    del rewards[server][ctx.selected_options[0]]
-
-    with open("rewards.json","w") as rewardsraw:
-        rewardsraw.write(json.dumps(rewards))
-
-    await ctx.send(f"removed {ctx.selected_options[0]} from this guild's rewards",hidden=True)
-
-@slash.slash()
+@bot.slash_command()
 async def leaderboard(ctx, hidden: bool = True):
     server = str(ctx.guild.id)
     user = str(ctx.author.id)
@@ -337,6 +316,6 @@ async def leaderboard(ctx, hidden: bool = True):
             message += addtomessage
 
     embed = discord.Embed(title=f"leaderboard for {ctx.guild.name}", description=message, color=discord.Color.blurple())
-    await ctx.send(embed=embed,hidden=hidden)
+    await ctx.respond(embed=embed,ephemeral=hidden)
 
-client.run(token)
+bot.run(token)
