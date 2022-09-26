@@ -64,8 +64,8 @@ async def on_message(message):
 @bot.event
 async def on_guild_join(guild):
 
-    internetfunny = discord.utils.get(bot.guilds, id=766848554899079218)
-    bots = discord.utils.get(internetfunny.channels, id=782228427880267776)
+    internetfunny = discord.utils.get(bot.guilds, id=987579392479858780)
+    bots = discord.utils.get(internetfunny.channels, id=1023740794064097410)
 
     await bots.send(f"i just joined a guild called **{guild.name}** and it has *{len(guild.members)}* members")
 
@@ -87,8 +87,8 @@ async def on_guild_join(guild):
 @bot.event
 async def on_guild_remove(guild):
 
-    internetfunny = discord.utils.get(bot.guilds, id=766848554899079218)
-    bots = discord.utils.get(internetfunny.channels, id=782228427880267776)
+    internetfunny = discord.utils.get(bot.guilds, id=987579392479858780)
+    bots = discord.utils.get(internetfunny.channels, id=1023740794064097410)
 
     await bots.send(f"i just left a guild called **{guild.name}** and it had *{len(guild.members)}* members")
 
